@@ -11,6 +11,7 @@ import (
 
 type Config struct {
 	ServerAddress string
+	ExternalHost  string
 	CertFile      string
 	KeyFile       string
 	OIDCConfig    OIDCConfig
@@ -30,6 +31,7 @@ func LoadConfig() *Config {
 	certFile := os.Getenv("TLS_CERT_FILE")
 	keyFile := os.Getenv("TLS_KEY_FILE")
 	port := os.Getenv("PORT")
+	externalHost := os.Getenv("EXTERNAL_HOST")
 
 	if port == "" {
 		port = "8080" // Default port
@@ -46,8 +48,13 @@ func LoadConfig() *Config {
 		log.Fatal("OIDC_CLIENT_ID and OIDC_CLIENT_SECRET must be set")
 	}
 
+	if externalHost == "" {
+		externalHost = "localhost" // Default to localhost
+	}
+
 	return &Config{
 		ServerAddress: serverAddress,
+		ExternalHost:  externalHost,
 		CertFile:      certFile,
 		KeyFile:       keyFile,
 		OIDCConfig: OIDCConfig{

@@ -23,6 +23,9 @@ func main() {
 	// Initialize storage
 	storageBackend := storage.NewStorageBackend(cfg.StorageConfig)
 
+	// Service discovery route
+	router.HandleFunc("/.well-known/terraform.json", handlers.DiscoveryHandler(cfg)).Methods("GET")
+
 	// Auth routes
 	router.HandleFunc("/login", handlers.HandleLogin(oidcClient)).Methods("GET")
 	router.HandleFunc("/callback", handlers.HandleCallback(oidcClient)).Methods("GET")
