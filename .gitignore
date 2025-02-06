@@ -24,3 +24,8 @@ go.work.sum
 # env file
 .env
 build/
+
+# TLS certificates
+*.crt
+*.key
+*.pem

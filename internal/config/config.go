@@ -9,6 +9,8 @@ import (
 
 type Config struct {
 	ServerAddress string
+	CertFile      string
+	KeyFile       string
 	OIDCConfig    OIDCConfig
 	StorageConfig storage.StorageConfig
 }
@@ -23,6 +25,8 @@ type OIDCConfig struct {
 func LoadConfig() *Config {
 	clientID := os.Getenv("OIDC_CLIENT_ID")
 	clientSecret := os.Getenv("OIDC_CLIENT_SECRET")
+	certFile := os.Getenv("TLS_CERT_FILE")
+	keyFile := os.Getenv("TLS_KEY_FILE")
 
 	if clientID == "" || clientSecret == "" {
 		log.Fatal("OIDC_CLIENT_ID and OIDC_CLIENT_SECRET must be set")
@@ -30,6 +34,8 @@ func LoadConfig() *Config {
 
 	return &Config{
 		ServerAddress: ":8080",
+		CertFile:      certFile,
+		KeyFile:       keyFile,
 		OIDCConfig: OIDCConfig{
 			IssuerURL:    "https://accounts.google.com",
 			ClientID:     clientID,

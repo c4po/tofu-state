@@ -40,5 +40,17 @@ func main() {
 	apiRouter.HandleFunc("/modules/{name}", handlers.UploadModuleHandler(storageBackend)).Methods("POST")
 
 	log.Printf("Server starting on %s...\n", cfg.ServerAddress)
-	log.Fatal(http.ListenAndServe(cfg.ServerAddress, router))
+
+	if cfg.CertFile != "" && cfg.KeyFile != "" {
+		log.Printf("Using HTTPS with cert: %s and key: %s", cfg.CertFile, cfg.KeyFile)
+		log.Fatal(http.ListenAndServeTLS(
+			cfg.ServerAddress,
+			cfg.CertFile,
+			cfg.KeyFile,
+			router,
+		))
+	} else {
+		log.Println("WARNING: Running in insecure HTTP mode")
+		log.Fatal(http.ListenAndServe(cfg.ServerAddress, router))
+	}
 }
