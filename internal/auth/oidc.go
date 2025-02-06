@@ -13,7 +13,7 @@ import (
 
 type OIDCClient struct {
 	provider *oidc.Provider
-	config   oauth2.Config
+	Config   oauth2.Config
 }
 
 func NewOIDCClient(cfg config.OIDCConfig) *OIDCClient {
@@ -25,18 +25,18 @@ func NewOIDCClient(cfg config.OIDCConfig) *OIDCClient {
 
 	return &OIDCClient{
 		provider: provider,
-		config: oauth2.Config{
-			ClientID:     cfg.ClientID,
+		Config: oauth2.Config{
+			ClientID:     "tofu-cli",
 			ClientSecret: cfg.ClientSecret,
 			Endpoint:     provider.Endpoint(),
 			RedirectURL:  cfg.RedirectURL,
-			Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			Scopes:       []string{oidc.ScopeOpenID, "email"},
 		},
 	}
 }
 
 func (c *OIDCClient) VerifyToken(ctx context.Context, token string) (*oidc.IDToken, error) {
-	verifier := c.provider.Verifier(&oidc.Config{ClientID: c.config.ClientID})
+	verifier := c.provider.Verifier(&oidc.Config{ClientID: c.Config.ClientID})
 	return verifier.Verify(ctx, token)
 }
 

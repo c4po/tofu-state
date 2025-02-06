@@ -42,6 +42,9 @@ func main() {
 	apiRouter.HandleFunc("/modules", handlers.ListModulesHandler(storageBackend)).Methods("GET")
 	apiRouter.HandleFunc("/modules/{name}", handlers.UploadModuleHandler(storageBackend)).Methods("POST")
 
+	// Token endpoint
+	apiRouter.HandleFunc("/login/token", handlers.HandleToken(oidcClient)).Methods("POST")
+
 	log.Printf("Server starting on %s...\n", cfg.ServerAddress)
 
 	if cfg.CertFile != "" && cfg.KeyFile != "" {

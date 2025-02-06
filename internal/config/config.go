@@ -11,7 +11,6 @@ import (
 
 type Config struct {
 	ServerAddress string
-	ExternalHost  string
 	CertFile      string
 	KeyFile       string
 	OIDCConfig    OIDCConfig
@@ -31,7 +30,6 @@ func LoadConfig() *Config {
 	certFile := os.Getenv("TLS_CERT_FILE")
 	keyFile := os.Getenv("TLS_KEY_FILE")
 	port := os.Getenv("PORT")
-	externalHost := os.Getenv("EXTERNAL_HOST")
 
 	if port == "" {
 		port = "8080" // Default port
@@ -48,24 +46,32 @@ func LoadConfig() *Config {
 		log.Fatal("OIDC_CLIENT_ID and OIDC_CLIENT_SECRET must be set")
 	}
 
-	if externalHost == "" {
-		externalHost = "localhost" // Default to localhost
-	}
-
-	return &Config{
+	cfg := &Config{
 		ServerAddress: serverAddress,
-		ExternalHost:  externalHost,
 		CertFile:      certFile,
 		KeyFile:       keyFile,
 		OIDCConfig: OIDCConfig{
 			IssuerURL:    "https://accounts.google.com",
-			ClientID:     clientID,
+			ClientID:     "tofu-cli",
 			ClientSecret: clientSecret,
-			RedirectURL:  "http://localhost:8080/callback",
+			RedirectURL:  "http://localhost:10000/callback",
 		},
 		StorageConfig: storage.StorageConfig{
 			Type:      "local",
 			LocalPath: "./data",
 		},
 	}
+
+	// Validate redirect port is within allowed range
+	redirectPort := 10000 // First port in range
+	if _, port, err := net.SplitHostPort(cfg.OIDCConfig.RedirectURL); err == nil {
+		if p, err := strconv.Atoi(port); err == nil {
+			redirectPort = p
+		}
+	}
+	if redirectPort < 10000 || redirectPort > 10010 {
+		log.Fatal("OIDC redirect port must be between 10000-10010")
+	}
+
+	return cfg
 }
