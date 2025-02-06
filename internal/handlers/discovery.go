@@ -15,9 +15,9 @@ func DiscoveryHandler(cfg *config.Config) http.HandlerFunc {
 		}
 
 		discoveryDoc := map[string]string{
-			"login.v1":   baseURL + "/api/v1/login",
-			"modules.v1": baseURL + "/api/v1/modules",
-			"state.v1":   baseURL + "/api/v1/state",
+			"login.v1":   baseURL + "/api/v1/",
+			"modules.v1": baseURL + "/api/v1/",
+			"state.v1":   baseURL + "/api/v1/",
 		}
 
 		w.Header().Set("Content-Type", "application/json")
