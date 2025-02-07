@@ -16,12 +16,17 @@ import (
 func main() {
 	cfg := config.LoadConfig()
 
+	if len(cfg.SessionSecret) < 32 {
+		log.Fatal("Session secret must be at least 32 characters long")
+	}
+
 	store := sessions.NewCookieStore([]byte(cfg.SessionSecret))
 	store.Options = &sessions.Options{
 		Path:     "/",
 		MaxAge:   86400 * 7,
 		HttpOnly: true,
 		Secure:   cfg.Environment == "production",
+		SameSite: http.SameSiteLaxMode,
 	}
 
 	router := mux.NewRouter()

@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 func HandleLogin(oidc *auth.OIDCClient, store sessions.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session, _ := store.Get(r, auth.SessionName)
+		log.Printf("Initial session: %+v", session.Values)
 
 		// Generate random state
 		state, err := generateRandomString(32)
@@ -25,10 +27,14 @@ func HandleLogin(oidc *auth.OIDCClient, store sessions.Store) http.HandlerFunc {
 
 		// Store state in session
 		session.Values[auth.StateKey] = state
+		log.Printf("Saving session with state: %s", state)
 		if err := session.Save(r, w); err != nil {
+			log.Printf("Session save error: %v", err)
 			http.Error(w, "Session save failed", http.StatusInternalServerError)
 			return
 		}
+
+		log.Printf("Session saved successfully")
 
 		// Build redirect URL
 		redirectURL := fmt.Sprintf("%s://%s/callback",
