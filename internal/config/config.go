@@ -11,11 +11,12 @@ import (
 
 type Config struct {
 	ServerAddress string
+	Environment   string
+	SessionSecret string
 	CertFile      string
 	KeyFile       string
 	OIDCConfig    OIDCConfig
 	StorageConfig storage.StorageConfig
-	ExternalHost  string
 }
 
 type OIDCConfig struct {
@@ -33,7 +34,11 @@ func LoadConfig() *Config {
 	port := os.Getenv("PORT")
 
 	if port == "" {
-		port = "8080" // Default port
+		if certFile != "" && keyFile != "" {
+			port = "443" // Default HTTPS port
+		} else {
+			port = "80" // Default HTTP port
+		}
 	}
 
 	// Validate port number
@@ -61,17 +66,6 @@ func LoadConfig() *Config {
 			Type:      "local",
 			LocalPath: "./data",
 		},
-	}
-
-	// Validate redirect port is within allowed range
-	redirectPort := 10000 // First port in range
-	if _, port, err := net.SplitHostPort(cfg.OIDCConfig.RedirectURL); err == nil {
-		if p, err := strconv.Atoi(port); err == nil {
-			redirectPort = p
-		}
-	}
-	if redirectPort < 10000 || redirectPort > 10010 {
-		log.Fatal("OIDC redirect port must be between 10000-10010")
 	}
 
 	return cfg

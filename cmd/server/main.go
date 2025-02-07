@@ -10,10 +10,19 @@ import (
 	"github.com/c4po/tofu-state/internal/storage"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/sessions"
 )
 
 func main() {
 	cfg := config.LoadConfig()
+
+	store := sessions.NewCookieStore([]byte(cfg.SessionSecret))
+	store.Options = &sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7,
+		HttpOnly: true,
+		Secure:   cfg.Environment == "production",
+	}
 
 	router := mux.NewRouter()
 
@@ -27,13 +36,16 @@ func main() {
 	router.HandleFunc("/.well-known/terraform.json", handlers.DiscoveryHandler(cfg)).Methods("GET")
 
 	// Auth routes
-	router.HandleFunc("/login", handlers.HandleLogin(oidcClient)).Methods("GET")
-	router.HandleFunc("/callback", handlers.HandleCallback(oidcClient, cfg)).Methods("GET")
-	router.HandleFunc("/app/settings/tokens", handlers.HandleTokenRequest(oidcClient, cfg)).Methods("GET")
+	router.HandleFunc("/login", handlers.HandleLogin(oidcClient, store)).Methods("GET")
+	router.HandleFunc("/callback", handlers.HandleCallback(oidcClient, store)).Methods("GET")
+
+	appRouter := router.PathPrefix("/app").Subrouter()
+	appRouter.Use(auth.AuthMiddleware(store))
+	appRouter.HandleFunc("/settings/tokens", handlers.HandleTokenRequest(oidcClient, store)).Methods("GET")
 
 	// Protected routes
-	apiRouter := router.PathPrefix("/api/v1").Subrouter()
-	apiRouter.Use(auth.JWTMiddleware(oidcClient))
+	apiRouter := router.PathPrefix("/api").Subrouter()
+	apiRouter.Use(auth.AuthMiddleware(store))
 
 	// State management
 	apiRouter.HandleFunc("/state/{workspace}", handlers.GetStateHandler(storageBackend)).Methods("GET")
@@ -42,9 +54,6 @@ func main() {
 	// Module management
 	apiRouter.HandleFunc("/modules", handlers.ListModulesHandler(storageBackend)).Methods("GET")
 	apiRouter.HandleFunc("/modules/{name}", handlers.UploadModuleHandler(storageBackend)).Methods("POST")
-
-	// Token endpoint
-	apiRouter.HandleFunc("/login/token", handlers.HandleToken(oidcClient)).Methods("POST")
 
 	log.Printf("Server starting on %s...\n", cfg.ServerAddress)
 

@@ -8,6 +8,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.12.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/mux v1.8.1
+	github.com/gorilla/sessions v1.4.0
 	golang.org/x/oauth2 v0.26.0
 )
 
@@ -29,5 +30,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.14 // indirect
 	github.com/aws/smithy-go v1.22.2 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.2 // indirect
+	github.com/gorilla/securecookie v1.1.2 // indirect
 	golang.org/x/crypto v0.25.0 // indirect
 )

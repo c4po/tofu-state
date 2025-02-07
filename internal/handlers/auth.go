@@ -3,30 +3,18 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/c4po/tofu-state/internal/auth"
-	"github.com/c4po/tofu-state/internal/config"
 	"github.com/golang-jwt/jwt"
+	"github.com/gorilla/sessions"
 )
 
-func HandleLogin(oidc *auth.OIDCClient) http.HandlerFunc {
+func HandleLogin(oidc *auth.OIDCClient, store sessions.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Build redirect URL from request
-		redirectURL := oidc.Config.RedirectURL
-		if !strings.HasPrefix(redirectURL, "http") {
-			// If RedirectURL is just a path, add protocol and host
-			redirectURL = fmt.Sprintf("%s://%s%s",
-				getProtocol(r),
-				r.Host,
-				redirectURL,
-			)
-		}
-		oidc.Config.RedirectURL = redirectURL
+		session, _ := store.Get(r, auth.SessionName)
 
 		// Generate random state
 		state, err := generateRandomString(32)
@@ -35,16 +23,20 @@ func HandleLogin(oidc *auth.OIDCClient) http.HandlerFunc {
 			return
 		}
 
-		// Store state in cookie
-		http.SetCookie(w, &http.Cookie{
-			Name:     "oauth_state",
-			Value:    state,
-			MaxAge:   300,
-			HttpOnly: true,
-			Secure:   true,
-		})
+		// Store state in session
+		session.Values[auth.StateKey] = state
+		if err := session.Save(r, w); err != nil {
+			http.Error(w, "Session save failed", http.StatusInternalServerError)
+			return
+		}
 
-		// Redirect to OIDC provider
+		// Build redirect URL
+		redirectURL := fmt.Sprintf("%s://%s/callback",
+			getProtocol(r),
+			r.Host,
+		)
+		oidc.Config.RedirectURL = redirectURL
+
 		http.Redirect(w, r, oidc.Config.AuthCodeURL(state), http.StatusFound)
 	}
 }
@@ -56,17 +48,16 @@ func getProtocol(r *http.Request) string {
 	return "http"
 }
 
-func HandleCallback(oidc *auth.OIDCClient, cfg *config.Config) http.HandlerFunc {
+func HandleCallback(oidc *auth.OIDCClient, store sessions.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		session, _ := store.Get(r, auth.SessionName)
+
 		// Verify state
-		stateCookie, err := r.Cookie("oauth_state")
-		if err != nil || r.URL.Query().Get("state") != stateCookie.Value {
+		storedState, ok := session.Values[auth.StateKey].(string)
+		if !ok || r.URL.Query().Get("state") != storedState {
 			http.Error(w, "Invalid state", http.StatusBadRequest)
 			return
 		}
-
-		// Check if this is a token request
-		isTokenRequest := strings.HasPrefix(stateCookie.Value, "token_request:")
 
 		// Exchange code for token
 		token, err := oidc.Config.Exchange(r.Context(), r.URL.Query().Get("code"))
@@ -75,40 +66,14 @@ func HandleCallback(oidc *auth.OIDCClient, cfg *config.Config) http.HandlerFunc 
 			return
 		}
 
-		if isTokenRequest {
-			// Generate API token
-			apiToken, err := generateAPIToken(token.Extra("id_token").(string))
-			if err != nil {
-				http.Error(w, "Failed to generate API token", http.StatusInternalServerError)
-				return
-			}
-
-			// Display token directly in browser
-			w.Header().Set("Content-Type", "text/html")
-			fmt.Fprintf(w, `
-				<html><body>
-					<h1>OpenTofu API Token</h1>
-					<pre style="background:#eee;padding:1rem">%s</pre>
-					<p>Copy this token to use with OpenTofu:</p>
-					<code>tofu login %s -token="%s"</code>
-				</body></html>`,
-				apiToken, cfg.ExternalHost, apiToken)
-			return
-		}
-
-		// Get user info from ID token
-		rawIDToken, ok := token.Extra("id_token").(string)
-		if !ok {
-			http.Error(w, "No ID token", http.StatusInternalServerError)
-			return
-		}
-
-		idToken, err := oidc.VerifyToken(r.Context(), rawIDToken)
+		// Verify ID Token
+		idToken, err := oidc.VerifyToken(r.Context(), token.Extra("id_token").(string))
 		if err != nil {
-			http.Error(w, "Invalid ID token", http.StatusUnauthorized)
+			http.Error(w, "Failed to verify ID Token", http.StatusInternalServerError)
 			return
 		}
 
+		// Extract claims
 		var claims struct {
 			Email string `json:"email"`
 		}
@@ -117,63 +82,44 @@ func HandleCallback(oidc *auth.OIDCClient, cfg *config.Config) http.HandlerFunc 
 			return
 		}
 
-		// Create session
-		sessionID := auth.CreateSession(claims.Email)
-		http.SetCookie(w, &http.Cookie{
-			Name:     "session_token",
-			Value:    sessionID,
-			Expires:  time.Now().Add(24 * time.Hour),
-			HttpOnly: true,
-			Secure:   true,
-		})
+		// Save user email in session
+		session.Values["email"] = claims.Email
+		session.Save(r, w)
 
-		// Create session or return token
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
-			"access_token": token.AccessToken,
-			"token_type":   token.TokenType,
-		})
+		// Redirect to original URL
+		returnTo, _ := session.Values["return_to"].(string)
+		if returnTo == "" {
+			returnTo = "/"
+		}
+		http.Redirect(w, r, returnTo, http.StatusFound)
 	}
 }
 
-func HandleToken(oidc *auth.OIDCClient) http.HandlerFunc {
+func HandleTokenRequest(oidc *auth.OIDCClient, store sessions.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Implement OAuth2 token endpoint
-		// This should handle the token exchange using your OIDC client
-		// Example:
-		token, err := oidc.Config.Exchange(r.Context(), r.FormValue("code"))
-		if err != nil {
-			http.Error(w, "Failed to exchange token", http.StatusBadRequest)
+		session, _ := store.Get(r, auth.SessionName)
+		email := auth.GetUserEmail(session)
+		if email == "" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		json.NewEncoder(w).Encode(token)
-	}
-}
-
-func HandleTokenRequest(oidc *auth.OIDCClient, cfg *config.Config) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Check existing session
-		sessionCookie, err := r.Cookie("session_token")
-		if err == nil {
-			if session, valid := auth.GetSession(sessionCookie.Value); valid {
-				// Generate token for logged-in user
-				token, err := generateAPIToken(session.UserEmail)
-				if err == nil {
-					w.Header().Set("Content-Type", "text/html")
-					fmt.Fprintf(w, `<html><body>
-						<h1>OpenTofu API Token</h1>
-						<pre style="background:#eee;padding:1rem">%s</pre>
-						<p>Copy this token to use with OpenTofu:</p>
-						<code>tofu login %s -token="%s"</code>
-					</body></html>`, token, cfg.ExternalHost, token)
-					return
-				}
-			}
+		// Generate and display token
+		token, err := generateAPIToken(email)
+		if err != nil {
+			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+			return
 		}
 
-		// Redirect to login page
-		http.Redirect(w, r, "/login", http.StatusFound)
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprintf(w, `
+			<html>
+				<body>
+					<h1>API Token</h1>
+					<pre>%s</pre>
+					<p>Copy this token for use with OpenTofu</p>
+				</body>
+			</html>`, token)
 	}
 }
 
@@ -199,4 +145,18 @@ func generateAPIToken(email string) (string, error) {
 	// Sign token with server secret
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return t.SignedString([]byte("your-secret-key")) // Use proper secret management
+}
+
+func getEmailFromToken(token *jwt.Token) (string, error) {
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", fmt.Errorf("failed to parse token claims")
+	}
+
+	email, ok := claims["email"].(string)
+	if !ok {
+		return "", fmt.Errorf("no email found in token claims")
+	}
+
+	return email, nil
 }

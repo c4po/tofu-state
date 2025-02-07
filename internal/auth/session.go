@@ -1,37 +1,32 @@
 package auth
 
 import (
-	"crypto/rand"
-	"encoding/base64"
-	"time"
+	"net/http"
+
+	"github.com/gorilla/sessions"
 )
 
-type Session struct {
-	ID        string
-	UserEmail string
-	ExpiresAt time.Time
+const (
+	SessionName = "tofu_state_session"
+	UserKey     = "user_email"
+	StateKey    = "oauth_state"
+)
+
+func GetUserEmail(s *sessions.Session) string {
+	if val, ok := s.Values[UserKey].(string); ok {
+		return val
+	}
+	return ""
 }
 
-var sessions = make(map[string]Session) // In-memory store, use Redis in production
-
-func CreateSession(email string) string {
-	b := make([]byte, 32)
-	rand.Read(b)
-	sessionID := base64.URLEncoding.EncodeToString(b)
-
-	sessions[sessionID] = Session{
-		ID:        sessionID,
-		UserEmail: email,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
-	}
-
-	return sessionID
+func SetUserSession(w http.ResponseWriter, r *http.Request, store sessions.Store, email string) error {
+	session, _ := store.Get(r, SessionName)
+	session.Values[UserKey] = email
+	return session.Save(r, w)
 }
 
-func GetSession(sessionID string) (Session, bool) {
-	session, exists := sessions[sessionID]
-	if !exists || time.Now().After(session.ExpiresAt) {
-		return Session{}, false
-	}
-	return session, true
+func ClearSession(w http.ResponseWriter, r *http.Request, store sessions.Store) error {
+	session, _ := store.Get(r, SessionName)
+	session.Options.MaxAge = -1
+	return session.Save(r, w)
 }
