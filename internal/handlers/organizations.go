@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-tfe"
+	"github.com/hashicorp/jsonapi"
 )
 
 func OrganizationEntitlementsHandler() http.HandlerFunc {
@@ -19,11 +19,10 @@ func OrganizationEntitlementsHandler() http.HandlerFunc {
 			AuditLogging:   true,
 			Agents:         false,
 			CostEstimation: false,
+			// ... initialize other fields as needed ...
 		}
 
 		w.Header().Set("Content-Type", "application/vnd.api+json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"data": entitlements,
-		})
+		jsonapi.MarshalPayload(w, entitlements)
 	}
 }
