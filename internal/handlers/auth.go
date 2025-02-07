@@ -57,6 +57,7 @@ func getProtocol(r *http.Request) string {
 func HandleCallback(oidc *auth.OIDCClient, store sessions.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session, _ := store.Get(r, auth.SessionName)
+		log.Printf("[Callback] Initial session: %+v", session.Values)
 
 		// Verify state
 		storedState, ok := session.Values[auth.StateKey].(string)
@@ -89,14 +90,20 @@ func HandleCallback(oidc *auth.OIDCClient, store sessions.Store) http.HandlerFun
 		}
 
 		// Save user email in session
-		session.Values["email"] = claims.Email
-		session.Save(r, w)
+		session.Values[auth.UserKey] = claims.Email
+		if err := session.Save(r, w); err != nil {
+			log.Printf("[Callback] Session save error: %v", err)
+			http.Error(w, "Session save failed", http.StatusInternalServerError)
+			return
+		}
+		log.Printf("[Callback] Session saved with email: %s", claims.Email)
 
 		// Redirect to original URL
 		returnTo, _ := session.Values["return_to"].(string)
 		if returnTo == "" {
 			returnTo = "/"
 		}
+		log.Printf("[Callback] Redirecting to: %s", returnTo)
 		http.Redirect(w, r, returnTo, http.StatusFound)
 	}
 }
@@ -104,8 +111,13 @@ func HandleCallback(oidc *auth.OIDCClient, store sessions.Store) http.HandlerFun
 func HandleTokenRequest(oidc *auth.OIDCClient, store sessions.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session, _ := store.Get(r, auth.SessionName)
+		log.Printf("[TokenRequest] Session values: %+v", session.Values)
+
 		email := auth.GetUserEmail(session)
+		log.Printf("[TokenRequest] Retrieved email: %s", email)
+
 		if email == "" {
+			log.Printf("[TokenRequest] No email found, redirecting to login")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
