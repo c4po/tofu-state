@@ -168,25 +168,8 @@ func HandleTokenRequest(oidc *auth.OIDCClient, cfg *config.Config) http.HandlerF
 			}
 		}
 
-		// No valid session - start OIDC flow
-		state, err := generateRandomString(16)
-		if err != nil {
-			http.Error(w, "Failed to generate state", http.StatusInternalServerError)
-			return
-		}
-		state = fmt.Sprintf("token_request:%s", state)
-
-		// Store state in cookie
-		http.SetCookie(w, &http.Cookie{
-			Name:     "oauth_state",
-			Value:    state,
-			MaxAge:   300,
-			HttpOnly: true,
-			Secure:   true,
-		})
-
-		// Redirect to OIDC provider
-		http.Redirect(w, r, oidc.Config.AuthCodeURL(state), http.StatusFound)
+		// Redirect to login page
+		http.Redirect(w, r, "/login", http.StatusFound)
 	}
 }
 
