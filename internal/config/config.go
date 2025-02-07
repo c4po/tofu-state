@@ -56,6 +56,7 @@ func LoadConfig() *Config {
 		ServerAddress: serverAddress,
 		CertFile:      certFile,
 		KeyFile:       keyFile,
+		SessionSecret: "abcdefghijklmnopqrstuvwxyz123456",
 		OIDCConfig: OIDCConfig{
 			IssuerURL:    "https://accounts.google.com",
 			ClientID:     clientID,
