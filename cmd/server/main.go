@@ -31,6 +31,14 @@ func main() {
 
 	router := mux.NewRouter()
 
+	// Add logging middleware to log all requests
+	router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("[DEBUG] %s %s", r.Method, r.URL.Path)
+			next.ServeHTTP(w, r)
+		})
+	})
+
 	// Initialize OIDC
 	oidcClient := auth.NewOIDCClient(cfg.OIDCConfig)
 
