@@ -3,6 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+
+	tfe "github.com/hashicorp/go-tfe"
 )
 
 func AccountDetailsHandler() http.HandlerFunc {
@@ -10,25 +12,25 @@ func AccountDetailsHandler() http.HandlerFunc {
 		// Get user from context (set by JWT middleware)
 		email := r.Context().Value("userEmail").(string)
 
-		response := map[string]interface{}{
-			"data": map[string]interface{}{
-				"id":   "user-" + email,
-				"type": "users",
-				"attributes": map[string]interface{}{
-					"username":           email,
-					"email":              email,
-					"is-service-account": false,
-					"avatar-url":         "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp",
-					"permissions": map[string]bool{
-						"can-create-organizations": true,
-						"can-change-email":         true,
-						"can-change-username":      true,
-					},
-				},
-				"links": map[string]string{
-					"self": "/api/v2/users/user-" + email,
-				},
+		// Use tfe.User struct for the main resource object
+		user := &tfe.User{
+			ID:               "user-" + email,
+			Username:         email,
+			Email:            email,
+			IsServiceAccount: false,
+			AvatarURL:        "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp",
+			Permissions: &tfe.UserPermissions{
+				CanCreateOrganizations: true,
+				CanChangeEmail:         true,
+				CanChangeUsername:      true,
 			},
+		}
+
+		// Use standard JSON API response structure
+		response := struct {
+			Data *tfe.User `json:"data"`
+		}{
+			Data: user,
 		}
 
 		w.Header().Set("Content-Type", "application/vnd.api+json")

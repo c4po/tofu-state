@@ -60,7 +60,7 @@ func main() {
 	apiRouter := router.PathPrefix("/api/tfe/v2").Subrouter()
 	apiRouter.Use(auth.JWTMiddleware(cfg.JWTSecret))
 	apiRouter.HandleFunc("/account/details", handlers.AccountDetailsHandler()).Methods("GET")
-
+	apiRouter.HandleFunc("/organizations/{organization_name}/entitlement-set", handlers.OrganizationEntitlementsHandler()).Methods("GET")
 	// State management
 	apiRouter.HandleFunc("/state/{workspace}", handlers.GetStateHandler(storageBackend)).Methods("GET")
 	apiRouter.HandleFunc("/state/{workspace}", handlers.PutStateHandler(storageBackend)).Methods("PUT")
