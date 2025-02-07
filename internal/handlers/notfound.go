@@ -2,10 +2,14 @@ package handlers
 
 import (
 	"html/template"
+	"log"
 	"net/http"
 )
 
 func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
+	// Add JSON logging for 404 requests
+	log.Printf(`{"method":"%s","path":"%s","status":404}`, r.Method, r.URL.Path)
+
 	w.WriteHeader(http.StatusNotFound)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
