@@ -20,7 +20,7 @@ func DiscoveryHandler(cfg *config.Config) http.HandlerFunc {
 		// Add login.v1 only if OIDC is configured
 		if cfg.OIDCConfig.ClientID != "" {
 			discoveryDoc["login.v1"] = map[string]interface{}{
-				"client":      "tofu-cli",
+				"client":      cfg.OIDCConfig.ClientID,
 				"grant_types": []string{"authz_code"},
 				"authz":       "/login",
 				"token":       "/api/v1/login/token",

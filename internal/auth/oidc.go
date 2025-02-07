@@ -26,7 +26,7 @@ func NewOIDCClient(cfg config.OIDCConfig) *OIDCClient {
 	return &OIDCClient{
 		provider: provider,
 		Config: oauth2.Config{
-			ClientID:     "tofu-cli",
+			ClientID:     cfg.ClientID,
 			ClientSecret: cfg.ClientSecret,
 			Endpoint:     provider.Endpoint(),
 			RedirectURL:  cfg.RedirectURL,

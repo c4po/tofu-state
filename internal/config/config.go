@@ -52,7 +52,7 @@ func LoadConfig() *Config {
 		KeyFile:       keyFile,
 		OIDCConfig: OIDCConfig{
 			IssuerURL:    "https://accounts.google.com",
-			ClientID:     "tofu-cli",
+			ClientID:     clientID,
 			ClientSecret: clientSecret,
 			RedirectURL:  "http://localhost:10000/callback",
 		},
