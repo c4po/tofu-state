@@ -12,20 +12,9 @@ func DiscoveryHandler(cfg *config.Config) http.HandlerFunc {
 		discoveryDoc := map[string]interface{}{
 			"modules.v1": "/api/registry/v1/modules/",
 			"state.v2":   "/api/v2/",
-			"tfe.v2":     "/api/v2/",
-			"tfe.v2.1":   "/api/v2/",
-			"tfe.v2.2":   "/api/v2/",
-		}
-
-		// Add login.v1 only if OIDC is configured
-		if cfg.OIDCConfig.ClientID != "" {
-			discoveryDoc["login.v1"] = map[string]interface{}{
-				"client":      cfg.OIDCConfig.ClientID,
-				"grant_types": []string{"authz_code"},
-				"authz":       "/login",
-				"token":       "/api/v1/login/token",
-				"ports":       []int{10000, 10010},
-			}
+			"tfe.v2":     "/api/tfe/v2/",
+			"tfe.v2.1":   "/api/tfe/v2/",
+			"tfe.v2.2":   "/api/tfe/v2/",
 		}
 
 		w.Header().Set("Content-Type", "application/json")
