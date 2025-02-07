@@ -10,11 +10,20 @@ import (
 	"time"
 
 	"github.com/c4po/tofu-state/internal/auth"
+	"github.com/c4po/tofu-state/internal/config"
 	"github.com/golang-jwt/jwt"
 )
 
 func HandleLogin(oidc *auth.OIDCClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Build redirect URL from request
+		redirectURL := fmt.Sprintf("%s://%s%s",
+			getProtocol(r),
+			r.Host,
+			oidc.Config.RedirectURL,
+		)
+		oidc.Config.RedirectURL = redirectURL
+
 		// Generate random state
 		state, err := generateRandomString(32)
 		if err != nil {
@@ -36,7 +45,14 @@ func HandleLogin(oidc *auth.OIDCClient) http.HandlerFunc {
 	}
 }
 
-func HandleCallback(oidc *auth.OIDCClient) http.HandlerFunc {
+func getProtocol(r *http.Request) string {
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		return "https"
+	}
+	return "http"
+}
+
+func HandleCallback(oidc *auth.OIDCClient, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Verify state
 		stateCookie, err := r.Cookie("oauth_state")
@@ -63,8 +79,16 @@ func HandleCallback(oidc *auth.OIDCClient) http.HandlerFunc {
 				return
 			}
 
-			// Redirect to CLI with token
-			http.Redirect(w, r, fmt.Sprintf("http://localhost:10000/callback?token=%s", apiToken), http.StatusFound)
+			// Display token directly in browser
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprintf(w, `
+				<html><body>
+					<h1>OpenTofu API Token</h1>
+					<pre style="background:#eee;padding:1rem">%s</pre>
+					<p>Copy this token to use with OpenTofu:</p>
+					<code>tofu login %s -token="%s"</code>
+				</body></html>`,
+				apiToken, cfg.ExternalHost, apiToken)
 			return
 		}
 
@@ -123,7 +147,7 @@ func HandleToken(oidc *auth.OIDCClient) http.HandlerFunc {
 	}
 }
 
-func HandleTokenRequest(oidc *auth.OIDCClient) http.HandlerFunc {
+func HandleTokenRequest(oidc *auth.OIDCClient, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Check existing session
 		sessionCookie, err := r.Cookie("session_token")
@@ -136,9 +160,9 @@ func HandleTokenRequest(oidc *auth.OIDCClient) http.HandlerFunc {
 					fmt.Fprintf(w, `<html><body>
 						<h1>OpenTofu API Token</h1>
 						<pre style="background:#eee;padding:1rem">%s</pre>
-						<p>Use this token in your OpenTofu configuration:</p>
-						<code>tofu login -token="%s"</code>
-					</body></html>`, token, token)
+						<p>Copy this token to use with OpenTofu:</p>
+						<code>tofu login %s -token="%s"</code>
+					</body></html>`, token, cfg.ExternalHost, token)
 					return
 				}
 			}

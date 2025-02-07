@@ -28,8 +28,8 @@ func main() {
 
 	// Auth routes
 	router.HandleFunc("/login", handlers.HandleLogin(oidcClient)).Methods("GET")
-	router.HandleFunc("/callback", handlers.HandleCallback(oidcClient)).Methods("GET")
-	router.HandleFunc("/app/settings/tokens", handlers.HandleTokenRequest(oidcClient)).Methods("GET")
+	router.HandleFunc("/callback", handlers.HandleCallback(oidcClient, cfg)).Methods("GET")
+	router.HandleFunc("/app/settings/tokens", handlers.HandleTokenRequest(oidcClient, cfg)).Methods("GET")
 
 	// Protected routes
 	apiRouter := router.PathPrefix("/api/v1").Subrouter()

@@ -15,6 +15,7 @@ type Config struct {
 	KeyFile       string
 	OIDCConfig    OIDCConfig
 	StorageConfig storage.StorageConfig
+	ExternalHost  string
 }
 
 type OIDCConfig struct {
@@ -54,7 +55,7 @@ func LoadConfig() *Config {
 			IssuerURL:    "https://accounts.google.com",
 			ClientID:     clientID,
 			ClientSecret: clientSecret,
-			RedirectURL:  "http://localhost:10000/callback",
+			RedirectURL:  "/callback",
 		},
 		StorageConfig: storage.StorageConfig{
 			Type:      "local",
