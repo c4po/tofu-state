@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/c4po/tofu-state/internal/auth"
+	"github.com/c4po/tofu-state/internal/config"
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/sessions"
 )
@@ -162,7 +163,8 @@ func generateAPIToken(email string) (string, error) {
 
 	// Sign token with server secret
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return t.SignedString([]byte("your-secret-key")) // Use proper secret management
+	cfg := config.LoadConfig()
+	return t.SignedString([]byte(cfg.JWTSecret))
 }
 
 func getEmailFromToken(token *jwt.Token) (string, error) {

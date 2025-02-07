@@ -49,8 +49,9 @@ func main() {
 	appRouter.HandleFunc("/settings/tokens", handlers.HandleTokenRequest(oidcClient, store)).Methods("GET")
 
 	// Protected routes
-	apiRouter := router.PathPrefix("/api").Subrouter()
-	apiRouter.Use(auth.AuthMiddleware(store))
+	apiRouter := router.PathPrefix("/api/tfe/v2").Subrouter()
+	apiRouter.Use(auth.JWTMiddleware(cfg.JWTSecret))
+	apiRouter.HandleFunc("/account/details", handlers.AccountDetailsHandler()).Methods("GET")
 
 	// State management
 	apiRouter.HandleFunc("/state/{workspace}", handlers.GetStateHandler(storageBackend)).Methods("GET")

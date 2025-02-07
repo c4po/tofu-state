@@ -13,6 +13,7 @@ type Config struct {
 	ServerAddress string
 	Environment   string
 	SessionSecret string
+	JWTSecret     string
 	CertFile      string
 	KeyFile       string
 	OIDCConfig    OIDCConfig
@@ -52,10 +53,16 @@ func LoadConfig() *Config {
 		log.Fatal("OIDC_CLIENT_ID and OIDC_CLIENT_SECRET must be set")
 	}
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "default-insecure-secret-please-change-in-prod"
+	}
+
 	cfg := &Config{
 		ServerAddress: serverAddress,
 		CertFile:      certFile,
 		KeyFile:       keyFile,
+		JWTSecret:     jwtSecret,
 		SessionSecret: "abcdefghijklmnopqrstuvwxyz123456",
 		OIDCConfig: OIDCConfig{
 			IssuerURL:    "https://accounts.google.com",

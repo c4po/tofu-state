@@ -12,4 +12,4 @@ WORKDIR /root/
 COPY --from=builder /app/tofu-service .
 COPY --from=builder /app/config.yaml .
 EXPOSE 8080
-CMD ["./tofu-service"] 
+CMD ["./tofu-service", "-jwt-secret", "$JWT_SECRET"] 
