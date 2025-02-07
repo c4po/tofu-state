@@ -17,11 +17,15 @@ import (
 func HandleLogin(oidc *auth.OIDCClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Build redirect URL from request
-		redirectURL := fmt.Sprintf("%s://%s%s",
-			getProtocol(r),
-			r.Host,
-			oidc.Config.RedirectURL,
-		)
+		redirectURL := oidc.Config.RedirectURL
+		if !strings.HasPrefix(redirectURL, "http") {
+			// If RedirectURL is just a path, add protocol and host
+			redirectURL = fmt.Sprintf("%s://%s%s",
+				getProtocol(r),
+				r.Host,
+				redirectURL,
+			)
+		}
 		oidc.Config.RedirectURL = redirectURL
 
 		// Generate random state

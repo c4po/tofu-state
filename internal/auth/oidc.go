@@ -29,7 +29,7 @@ func NewOIDCClient(cfg config.OIDCConfig) *OIDCClient {
 			ClientID:     cfg.ClientID,
 			ClientSecret: cfg.ClientSecret,
 			Endpoint:     provider.Endpoint(),
-			RedirectURL:  "", // Will be set dynamically per request
+			RedirectURL:  cfg.RedirectURL,
 			Scopes:       []string{oidc.ScopeOpenID, "email"},
 		},
 	}
