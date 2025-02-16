@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/c4po/tofu-state/internal/handlers/common"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
@@ -69,7 +70,8 @@ func JWTMiddleware(secret string) mux.MiddlewareFunc {
 			}
 
 			fmt.Printf("[JWT Middleware] Successfully authenticated user: %s\n", email)
-			ctx := context.WithValue(r.Context(), "userEmail", email)
+			ctx := context.WithValue(r.Context(), common.UserEmailKey, email)
+			ctx = context.WithValue(ctx, common.UserTokenKey, tokenString)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

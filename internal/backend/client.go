@@ -1,0 +1,26 @@
+package backend
+
+import (
+	"context"
+
+	"github.com/hashicorp/go-tfe"
+)
+
+// GetTFEClient returns a configured TFE client
+func GetTFEClient(address string, token string) (*tfe.Client, error) {
+	config := &tfe.Config{
+		Address: address,
+		Token:   token,
+		// Enable retrying on server errors
+		RetryServerErrors: true,
+	}
+
+	return tfe.NewClient(config)
+}
+
+// ValidateClient checks if the client can connect to the TFE server
+func ValidateClient(client *tfe.Client) error {
+	// Try to read the current user as a basic validation
+	_, err := client.Users.ReadCurrent(context.Background())
+	return err
+}

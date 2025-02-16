@@ -1,0 +1,15 @@
+session_secret: "your-session-secret"
+jwt_secret: "your-jwt-secret"
+cert_file: "your-cert-file"
+key_file: "your-key-file"
+backend_url: "http://localhost:8080"
+
+oidc:
+  issuer_url: "https://accounts.google.com"
+  client_id: "your-client-id"
+  client_secret: "your-client-secret"
+  redirect_url: "/callback"
+
+storage:
+  type: "local"
+  local_path: "./data"

@@ -2,78 +2,64 @@ package config
 
 import (
 	"log"
-	"net"
 	"os"
-	"strconv"
 
 	"github.com/c4po/tofu-state/internal/storage"
+	"github.com/kelseyhightower/envconfig"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	ServerAddress string
-	Environment   string
-	SessionSecret string
-	JWTSecret     string
-	CertFile      string
-	KeyFile       string
-	OIDCConfig    OIDCConfig
-	StorageConfig storage.StorageConfig
+	ServerAddress string                `yaml:"server_address,omitempty"`
+	SessionSecret string                `yaml:"session_secret,omitempty"`
+	JWTSecret     string                `yaml:"jwt_secret,omitempty"`
+	CertFile      string                `yaml:"cert_file,omitempty"`
+	KeyFile       string                `yaml:"key_file,omitempty"`
+	OIDCConfig    OIDCConfig            `yaml:"oidc"`
+	StorageConfig storage.StorageConfig `yaml:"storage"`
+	BackendURL    string                `yaml:"backend_url,omitempty"`
 }
 
 type OIDCConfig struct {
-	IssuerURL    string
-	ClientID     string
-	ClientSecret string
-	RedirectURL  string
+	IssuerURL    string `yaml:"issuer_url"`
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
+	RedirectURL  string `yaml:"redirect_url"`
 }
 
 func LoadConfig() *Config {
-	clientID := os.Getenv("OIDC_CLIENT_ID")
-	clientSecret := os.Getenv("OIDC_CLIENT_SECRET")
-	certFile := os.Getenv("TLS_CERT_FILE")
-	keyFile := os.Getenv("TLS_KEY_FILE")
-	port := os.Getenv("PORT")
-
-	if port == "" {
-		if certFile != "" && keyFile != "" {
-			port = "443" // Default HTTPS port
-		} else {
-			port = "80" // Default HTTP port
+	// Load base config from YAML
+	cfg := &Config{}
+	if data, err := os.ReadFile("config.yaml"); err == nil {
+		if err := yaml.Unmarshal(data, cfg); err != nil {
+			log.Fatal("Error parsing config.yaml: ", err)
 		}
 	}
 
-	// Validate port number
-	if portNum, _ := strconv.ParseUint(port, 10, 16); portNum < 1 || portNum > 65535 {
-		log.Fatalf("Invalid port number: %s (must be 1-65535)", port)
+	// Override with environment variables (TFS_ prefix)
+	err := envconfig.Process("TFS", cfg)
+	if err != nil {
+		log.Fatal("Error processing environment variables: ", err)
 	}
 
-	serverAddress := net.JoinHostPort("0.0.0.0", port)
-
-	if clientID == "" || clientSecret == "" {
-		log.Fatal("OIDC_CLIENT_ID and OIDC_CLIENT_SECRET must be set")
+	if cfg.JWTSecret == "" {
+		cfg.JWTSecret = "default-insecure-secret-please-change-in-prod"
 	}
 
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "default-insecure-secret-please-change-in-prod"
+	if cfg.SessionSecret == "" {
+		cfg.SessionSecret = "default-insecure-secret-please-change-in-prod"
 	}
 
-	cfg := &Config{
-		ServerAddress: serverAddress,
-		CertFile:      certFile,
-		KeyFile:       keyFile,
-		JWTSecret:     jwtSecret,
-		SessionSecret: "abcdefghijklmnopqrstuvwxyz123456",
-		OIDCConfig: OIDCConfig{
-			IssuerURL:    "https://accounts.google.com",
-			ClientID:     clientID,
-			ClientSecret: clientSecret,
-			RedirectURL:  "/callback",
-		},
-		StorageConfig: storage.StorageConfig{
-			Type:      "local",
-			LocalPath: "./data",
-		},
+	if cfg.ServerAddress == "" {
+		if cfg.CertFile != "" && cfg.KeyFile != "" {
+			cfg.ServerAddress = "0.0.0.0:443"
+		} else {
+			cfg.ServerAddress = "0.0.0.0:80"
+		}
+	}
+
+	if cfg.BackendURL == "" {
+		cfg.BackendURL = "http://localhost:8080"
 	}
 
 	return cfg

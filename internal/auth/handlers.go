@@ -1,4 +1,4 @@
-package handlers
+package auth
 
 import (
 	"crypto/rand"
@@ -8,15 +8,14 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/c4po/tofu-state/internal/auth"
 	"github.com/c4po/tofu-state/internal/config"
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/sessions"
 )
 
-func HandleLogin(oidc *auth.OIDCClient, store sessions.Store) http.HandlerFunc {
+func HandleLogin(oidc *OIDCClient, store sessions.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		session, _ := store.Get(r, auth.SessionName)
+		session, _ := store.Get(r, SessionName)
 		log.Printf("Initial session: %+v", session.Values)
 
 		// Generate random state
@@ -27,7 +26,7 @@ func HandleLogin(oidc *auth.OIDCClient, store sessions.Store) http.HandlerFunc {
 		}
 
 		// Store state in session
-		session.Values[auth.StateKey] = state
+		session.Values[StateKey] = state
 		log.Printf("Saving session with state: %s", state)
 		if err := session.Save(r, w); err != nil {
 			log.Printf("Session save error: %v", err)
@@ -55,13 +54,13 @@ func getProtocol(r *http.Request) string {
 	return "http"
 }
 
-func HandleCallback(oidc *auth.OIDCClient, store sessions.Store) http.HandlerFunc {
+func HandleCallback(oidc *OIDCClient, store sessions.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		session, _ := store.Get(r, auth.SessionName)
+		session, _ := store.Get(r, SessionName)
 		log.Printf("[Callback] Initial session: %+v", session.Values)
 
 		// Verify state
-		storedState, ok := session.Values[auth.StateKey].(string)
+		storedState, ok := session.Values[StateKey].(string)
 		if !ok || r.URL.Query().Get("state") != storedState {
 			http.Error(w, "Invalid state", http.StatusBadRequest)
 			return
@@ -91,7 +90,7 @@ func HandleCallback(oidc *auth.OIDCClient, store sessions.Store) http.HandlerFun
 		}
 
 		// Save user email in session
-		session.Values[auth.UserKey] = claims.Email
+		session.Values[UserKey] = claims.Email
 		if err := session.Save(r, w); err != nil {
 			log.Printf("[Callback] Session save error: %v", err)
 			http.Error(w, "Session save failed", http.StatusInternalServerError)
@@ -109,12 +108,12 @@ func HandleCallback(oidc *auth.OIDCClient, store sessions.Store) http.HandlerFun
 	}
 }
 
-func HandleTokenRequest(oidc *auth.OIDCClient, store sessions.Store) http.HandlerFunc {
+func HandleTokenRequest(oidc *OIDCClient, store sessions.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		session, _ := store.Get(r, auth.SessionName)
+		session, _ := store.Get(r, SessionName)
 		log.Printf("[TokenRequest] Session values: %+v", session.Values)
 
-		email := auth.GetUserEmail(session)
+		email := GetUserEmail(session)
 		log.Printf("[TokenRequest] Retrieved email: %s", email)
 
 		if email == "" {
