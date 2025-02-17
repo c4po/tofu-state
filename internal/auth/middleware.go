@@ -10,6 +10,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
+	"go.uber.org/zap"
 )
 
 func AuthMiddleware(store sessions.Store) func(http.Handler) http.Handler {
@@ -27,19 +28,19 @@ func AuthMiddleware(store sessions.Store) func(http.Handler) http.Handler {
 	}
 }
 
-func JWTMiddleware(secret string) mux.MiddlewareFunc {
+func JWTMiddleware(secret string, logger *zap.Logger) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Printf("[JWT Middleware] Processing request for: %s\n", r.URL.Path)
+			logger.Debug("Processing request", zap.String("path", r.URL.Path))
 
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
-				fmt.Println("[JWT Middleware] Missing Authorization header")
+				logger.Debug("Missing Authorization header")
 				http.Error(w, "Authorization header required", http.StatusUnauthorized)
 				return
 			}
 
-			fmt.Println("[JWT Middleware] Found Authorization header, parsing token")
+			logger.Debug("Found Authorization header, parsing token")
 			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -49,27 +50,27 @@ func JWTMiddleware(secret string) mux.MiddlewareFunc {
 			})
 
 			if err != nil || !token.Valid {
-				fmt.Printf("[JWT Middleware] Token validation failed: %v\n", err)
+				logger.Debug("Token validation failed", zap.Error(err))
 				http.Error(w, "Invalid token", http.StatusUnauthorized)
 				return
 			}
 
-			fmt.Println("[JWT Middleware] Token is valid, checking claims")
+			logger.Debug("Token is valid, checking claims")
 			claims, ok := token.Claims.(jwt.MapClaims)
 			if !ok {
-				fmt.Println("[JWT Middleware] Failed to parse token claims")
+				logger.Debug("Failed to parse token claims")
 				http.Error(w, "Invalid token claims", http.StatusUnauthorized)
 				return
 			}
 
 			email, ok := claims["email"].(string)
 			if !ok || email == "" {
-				fmt.Println("[JWT Middleware] No valid email found in token claims")
+				logger.Debug("No valid email found in token claims")
 				http.Error(w, "Invalid email in token", http.StatusUnauthorized)
 				return
 			}
 
-			fmt.Printf("[JWT Middleware] Successfully authenticated user: %s\n", email)
+			logger.Debug("Successfully authenticated user", zap.String("email", email))
 			ctx := context.WithValue(r.Context(), common.UserEmailKey, email)
 			ctx = context.WithValue(ctx, common.UserTokenKey, tokenString)
 			next.ServeHTTP(w, r.WithContext(ctx))

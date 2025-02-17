@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	"time"
 
@@ -11,13 +10,18 @@ import (
 	"github.com/c4po/tofu-state/internal/storage"
 
 	"github.com/gorilla/sessions"
+	"go.uber.org/zap"
 )
 
 func main() {
+	// Initialize logger
+	logger, _ := zap.NewDevelopment()
+	defer logger.Sync()
+
 	cfg := config.LoadConfig()
 
 	if len(cfg.SessionSecret) < 32 {
-		log.Fatal("Session secret must be at least 32 characters long")
+		logger.Fatal("Session secret must be at least 32 characters long")
 	}
 
 	store := sessions.NewCookieStore([]byte(cfg.SessionSecret))
@@ -30,23 +34,23 @@ func main() {
 	}
 
 	// Initialize OIDC
-	oidcClient := auth.NewOIDCClient(cfg.OIDCConfig)
+	oidcClient := auth.NewOIDCClient(cfg.OIDCConfig, logger)
 
 	// Initialize storage
-	storageBackend := storage.NewStorageBackend(cfg.StorageConfig)
+	storageBackend := storage.NewStorageBackend(cfg.StorageConfig, logger)
 
 	// Setup router
-	router := handlers.SetupRouter(cfg, store, oidcClient, storageBackend)
+	router := handlers.SetupRouter(cfg, store, oidcClient, storageBackend, logger)
 
 	// Add logging middleware
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("[DEBUG] %s %s", r.Method, r.URL.Path)
+			logger.Debug("Request", zap.String("method", r.Method), zap.String("path", r.URL.Path))
 			next.ServeHTTP(w, r)
 		})
 	})
 
-	log.Printf("Server starting on %s...\n", cfg.ServerAddress)
+	logger.Info("Server starting on", zap.String("address", cfg.ServerAddress))
 
 	server := &http.Server{
 		Addr:         cfg.ServerAddress,
@@ -57,10 +61,16 @@ func main() {
 	}
 
 	if cfg.CertFile != "" && cfg.KeyFile != "" {
-		log.Printf("Using HTTPS with cert: %s and key: %s", cfg.CertFile, cfg.KeyFile)
-		log.Fatal(server.ListenAndServeTLS(cfg.CertFile, cfg.KeyFile))
+		logger.Info("Using HTTPS with cert", zap.String("cert", cfg.CertFile), zap.String("key", cfg.KeyFile))
+		err := server.ListenAndServeTLS(cfg.CertFile, cfg.KeyFile)
+		if err != nil {
+			logger.Fatal("Failed to start HTTPS server", zap.Error(err))
+		}
 	} else {
-		log.Println("WARNING: Running in insecure HTTP mode")
-		log.Fatal(server.ListenAndServe())
+		logger.Warn("WARNING: Running in insecure HTTP mode")
+		err := server.ListenAndServe()
+		if err != nil {
+			logger.Fatal("Failed to start HTTP server", zap.Error(err))
+		}
 	}
 }

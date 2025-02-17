@@ -13,42 +13,56 @@ import (
 	"github.com/c4po/tofu-state/internal/storage"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
+	"go.uber.org/zap"
 )
 
-func SetupRouter(cfg *config.Config, store sessions.Store, oidcClient *auth.OIDCClient, storageBackend storage.StorageBackend) *mux.Router {
+func SetupRouter(cfg *config.Config, store sessions.Store, oidcClient *auth.OIDCClient, storageBackend storage.StorageBackend, logger *zap.Logger) *mux.Router {
+	logger.Debug("Setting up router")
 	router := mux.NewRouter()
 
 	// Service discovery route
-	router.HandleFunc("/.well-known/terraform.json", discovery.Handler()).Methods("GET")
+	router.HandleFunc("/.well-known/terraform.json", discovery.Handler(logger)).Methods("GET")
 
 	// Auth routes
-	router.HandleFunc("/login", auth.HandleLogin(oidcClient, store)).Methods("GET")
-	router.HandleFunc("/callback", auth.HandleCallback(oidcClient, store)).Methods("GET")
+	router.HandleFunc("/login", auth.HandleLogin(oidcClient, store, logger)).Methods("GET")
+	router.HandleFunc("/callback", auth.HandleCallback(oidcClient, store, logger)).Methods("GET")
 
 	// App routes
 	appRouter := router.PathPrefix("/app").Subrouter()
 	appRouter.Use(auth.AuthMiddleware(store))
-	appRouter.HandleFunc("/account", account.DetailsHandler(cfg.BackendURL)).Methods("GET")
-	appRouter.HandleFunc("/settings/tokens", auth.HandleTokenRequest(oidcClient, store)).Methods("GET")
+	appRouter.HandleFunc("/account", account.DetailsHandler(cfg.BackendURL, logger)).Methods("GET")
+	appRouter.HandleFunc("/settings/tokens", auth.HandleTokenRequest(oidcClient, store, logger)).Methods("GET")
 
 	// API routes
 	apiRouter := router.PathPrefix("/api/tfe/v2").Subrouter()
-	apiRouter.Use(auth.JWTMiddleware(cfg.JWTSecret))
+	apiRouter.Use(auth.JWTMiddleware(cfg.JWTSecret, logger))
 
 	// Organization routes
 	apiRouter.HandleFunc("/organizations/{organization_name}/entitlements",
-		organizations.EntitlementsHandler(cfg.BackendURL)).Methods("GET")
+		organizations.EntitlementsHandler(cfg.BackendURL, logger)).Methods("GET")
 
 	// State management routes
-	apiRouter.HandleFunc("/state/{workspace}", state.GetHandler(storageBackend)).Methods("GET")
-	apiRouter.HandleFunc("/state/{workspace}", state.PutHandler(storageBackend)).Methods("PUT")
+	apiRouter.HandleFunc("/state/{workspace}", state.GetHandler(storageBackend, logger)).Methods("GET")
+	apiRouter.HandleFunc("/state/{workspace}", state.PutHandler(storageBackend, logger)).Methods("PUT")
 
 	// Module management routes
-	apiRouter.HandleFunc("/modules", modules.ListHandler(storageBackend)).Methods("GET")
-	apiRouter.HandleFunc("/modules/{name}", modules.UploadHandler(storageBackend)).Methods("POST")
+	apiRouter.HandleFunc("/modules", modules.ListHandler(storageBackend, logger)).Methods("GET")
+	apiRouter.HandleFunc("/modules/{name}", modules.UploadHandler(storageBackend, logger)).Methods("POST")
 
 	// Add catch-all handler
-	router.NotFoundHandler = http.HandlerFunc(NotFoundHandler)
+	router.NotFoundHandler = NotFoundHandler(logger)
 
+	// Add logging middleware
+	router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			logger.Debug("Request",
+				zap.String("method", r.Method),
+				zap.String("path", r.URL.Path),
+				zap.String("remote_addr", r.RemoteAddr))
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	logger.Info("Router setup complete")
 	return router
 }

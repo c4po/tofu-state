@@ -1,9 +1,15 @@
 package storage
 
-type GCSStorage struct{}
+import "go.uber.org/zap"
 
-func NewGCSStorage(cfg StorageConfig) *GCSStorage {
-	return &GCSStorage{}
+type GCSStorage struct {
+	logger *zap.Logger
+}
+
+func NewGCSStorage(cfg StorageConfig, logger *zap.Logger) *GCSStorage {
+	return &GCSStorage{
+		logger: logger,
+	}
 }
 
 func (g *GCSStorage) GetState(workspace string) ([]byte, error)    { return nil, nil }

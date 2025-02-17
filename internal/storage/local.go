@@ -1,14 +1,19 @@
 package storage
 
-import "os"
+import (
+	"os"
+
+	"go.uber.org/zap"
+)
 
 type LocalStorage struct {
-	path string
+	path   string
+	logger *zap.Logger
 }
 
-func NewLocalStorage(cfg StorageConfig) *LocalStorage {
+func NewLocalStorage(cfg StorageConfig, logger *zap.Logger) *LocalStorage {
 	os.MkdirAll(cfg.LocalPath, 0755)
-	return &LocalStorage{path: cfg.LocalPath}
+	return &LocalStorage{path: cfg.LocalPath, logger: logger}
 }
 
 func (l *LocalStorage) GetState(workspace string) ([]byte, error)    { return nil, nil }

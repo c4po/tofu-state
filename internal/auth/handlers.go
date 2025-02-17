@@ -4,19 +4,19 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/c4po/tofu-state/internal/config"
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/sessions"
+	"go.uber.org/zap"
 )
 
-func HandleLogin(oidc *OIDCClient, store sessions.Store) http.HandlerFunc {
+func HandleLogin(oidc *OIDCClient, store sessions.Store, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session, _ := store.Get(r, SessionName)
-		log.Printf("Initial session: %+v", session.Values)
+		logger.Debug("Initial session", zap.Any("session", session.Values))
 
 		// Generate random state
 		state, err := generateRandomString(32)
@@ -27,14 +27,14 @@ func HandleLogin(oidc *OIDCClient, store sessions.Store) http.HandlerFunc {
 
 		// Store state in session
 		session.Values[StateKey] = state
-		log.Printf("Saving session with state: %s", state)
+		logger.Debug("Saving session with state", zap.String("state", state))
 		if err := session.Save(r, w); err != nil {
-			log.Printf("Session save error: %v", err)
+			logger.Error("Session save error", zap.Error(err))
 			http.Error(w, "Session save failed", http.StatusInternalServerError)
 			return
 		}
 
-		log.Printf("Session saved successfully")
+		logger.Debug("Session saved successfully")
 
 		// Build redirect URL
 		redirectURL := fmt.Sprintf("%s://%s/callback",
@@ -54,10 +54,10 @@ func getProtocol(r *http.Request) string {
 	return "http"
 }
 
-func HandleCallback(oidc *OIDCClient, store sessions.Store) http.HandlerFunc {
+func HandleCallback(oidc *OIDCClient, store sessions.Store, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session, _ := store.Get(r, SessionName)
-		log.Printf("[Callback] Initial session: %+v", session.Values)
+		logger.Debug("Initial session", zap.Any("session", session.Values))
 
 		// Verify state
 		storedState, ok := session.Values[StateKey].(string)
@@ -92,32 +92,32 @@ func HandleCallback(oidc *OIDCClient, store sessions.Store) http.HandlerFunc {
 		// Save user email in session
 		session.Values[UserKey] = claims.Email
 		if err := session.Save(r, w); err != nil {
-			log.Printf("[Callback] Session save error: %v", err)
+			logger.Error("Session save error", zap.Error(err))
 			http.Error(w, "Session save failed", http.StatusInternalServerError)
 			return
 		}
-		log.Printf("[Callback] Session saved with email: %s", claims.Email)
+		logger.Debug("Session saved with email", zap.String("email", claims.Email))
 
 		// Redirect to original URL
 		returnTo, _ := session.Values["return_to"].(string)
 		if returnTo == "" {
 			returnTo = "/"
 		}
-		log.Printf("[Callback] Redirecting to: %s", returnTo)
+		logger.Debug("Redirecting to", zap.String("url", returnTo))
 		http.Redirect(w, r, returnTo, http.StatusFound)
 	}
 }
 
-func HandleTokenRequest(oidc *OIDCClient, store sessions.Store) http.HandlerFunc {
+func HandleTokenRequest(oidc *OIDCClient, store sessions.Store, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session, _ := store.Get(r, SessionName)
-		log.Printf("[TokenRequest] Session values: %+v", session.Values)
+		logger.Debug("Session values", zap.Any("session", session.Values))
 
 		email := GetUserEmail(session)
-		log.Printf("[TokenRequest] Retrieved email: %s", email)
+		logger.Debug("Retrieved email", zap.String("email", email))
 
 		if email == "" {
-			log.Printf("[TokenRequest] No email found, redirecting to login")
+			logger.Debug("No email found, redirecting to login")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -125,6 +125,7 @@ func HandleTokenRequest(oidc *OIDCClient, store sessions.Store) http.HandlerFunc
 		// Generate and display token
 		token, err := generateAPIToken(email)
 		if err != nil {
+			logger.Error("Failed to generate token", zap.Error(err))
 			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 			return
 		}
