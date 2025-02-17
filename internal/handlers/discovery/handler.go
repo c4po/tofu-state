@@ -1,13 +1,11 @@
 package discovery
 
 import (
+	"encoding/json"
 	"net/http"
-
-	"github.com/c4po/tofu-state/internal/config"
-	"github.com/c4po/tofu-state/internal/handlers/common"
 )
 
-func Handler(cfg *config.Config) http.HandlerFunc {
+func Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		discoveryDoc := map[string]interface{}{
 			"modules.v1": "/api/registry/v1/modules/",
@@ -17,8 +15,7 @@ func Handler(cfg *config.Config) http.HandlerFunc {
 			"tfe.v2.2":   "/api/tfe/v2/",
 		}
 
-		if err := common.RespondWithJSON(w, http.StatusOK, discoveryDoc); err != nil {
-			common.RespondWithError(w, err)
-		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(discoveryDoc)
 	}
 }

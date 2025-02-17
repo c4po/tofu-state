@@ -19,7 +19,7 @@ func SetupRouter(cfg *config.Config, store sessions.Store, oidcClient *auth.OIDC
 	router := mux.NewRouter()
 
 	// Service discovery route
-	router.HandleFunc("/.well-known/terraform.json", discovery.Handler(cfg)).Methods("GET")
+	router.HandleFunc("/.well-known/terraform.json", discovery.Handler()).Methods("GET")
 
 	// Auth routes
 	router.HandleFunc("/login", auth.HandleLogin(oidcClient, store)).Methods("GET")
