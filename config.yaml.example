@@ -1,0 +1,3 @@
+# Required for production
+JWT_SECRET: "your-32-character-super-secure-random-string"
+SESSION_SECRET: "another-32-character-super-secure-random-string" 

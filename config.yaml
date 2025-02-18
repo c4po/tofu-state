@@ -1,0 +1,15 @@
+session_secret: "butterfly-rainbow-ocean-mountain-secret"
+jwt_secret: "butterfly-rainbow-ocean-mountain-secret"
+cert_file: "/etc/letsencrypt/live/tofu.bonesoul.com/fullchain.pem"
+key_file: "/etc/letsencrypt/live/tofu.bonesoul.com/privkey.pem"
+backend_url: "https://tofu.bonesoul.com"
+
+oidc:
+  issuer_url: "https://accounts.google.com"
+  client_id: "1000000000000000000000000000000000000000"
+  client_secret: "1000000000000000000000000000000000000000"
+  redirect_url: "/callback"
+
+storage:
+  type: "local"
+  local_path: "./data"
