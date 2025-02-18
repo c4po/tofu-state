@@ -3,8 +3,8 @@ package auth
 import (
 	"context"
 
-	"github.com/c4po/tofu-state/internal/config"
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 )
@@ -15,9 +15,9 @@ type OIDCClient struct {
 	logger   *zap.Logger
 }
 
-func NewOIDCClient(cfg config.OIDCConfig, logger *zap.Logger) *OIDCClient {
+func NewOIDCClient(logger *zap.Logger) *OIDCClient {
 	ctx := context.Background()
-	provider, err := oidc.NewProvider(ctx, cfg.IssuerURL)
+	provider, err := oidc.NewProvider(ctx, viper.GetString("oidc.issuer_url"))
 	if err != nil {
 		logger.Fatal("Failed to create OIDC provider", zap.Error(err))
 	}
@@ -25,10 +25,10 @@ func NewOIDCClient(cfg config.OIDCConfig, logger *zap.Logger) *OIDCClient {
 	return &OIDCClient{
 		provider: provider,
 		Config: oauth2.Config{
-			ClientID:     cfg.ClientID,
-			ClientSecret: cfg.ClientSecret,
+			ClientID:     viper.GetString("oidc.client_id"),
+			ClientSecret: viper.GetString("oidc.client_secret"),
 			Endpoint:     provider.Endpoint(),
-			RedirectURL:  cfg.RedirectURL,
+			RedirectURL:  viper.GetString("oidc.redirect_url"),
 			Scopes:       []string{oidc.ScopeOpenID, "email"},
 		},
 		logger: logger,

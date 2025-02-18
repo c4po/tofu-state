@@ -1,6 +1,9 @@
 package storage
 
-import "go.uber.org/zap"
+import (
+	"github.com/spf13/viper"
+	"go.uber.org/zap"
+)
 
 type StorageBackend interface {
 	GetState(workspace string) ([]byte, error)
@@ -16,7 +19,13 @@ type StorageConfig struct {
 	LocalPath  string // For local storage
 }
 
-func NewStorageBackend(cfg StorageConfig, logger *zap.Logger) StorageBackend {
+func NewStorageBackend(logger *zap.Logger) StorageBackend {
+	cfg := StorageConfig{
+		Type:       viper.GetString("storage.type"),
+		BucketName: viper.GetString("storage.bucket_name"),
+		Region:     viper.GetString("storage.region"),
+		LocalPath:  viper.GetString("storage.local_path"),
+	}
 	switch cfg.Type {
 	case "s3":
 		return NewS3Storage(cfg, logger)

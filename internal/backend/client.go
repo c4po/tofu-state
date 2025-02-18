@@ -4,12 +4,13 @@ import (
 	"context"
 
 	"github.com/hashicorp/go-tfe"
+	"github.com/spf13/viper"
 )
 
 // GetTFEClient returns a configured TFE client
-func GetTFEClient(address string, token string) (*tfe.Client, error) {
+func GetTFEClient(token string) (*tfe.Client, error) {
 	config := &tfe.Config{
-		Address: address,
+		Address: viper.GetString("tfe_backend_url"),
 		Token:   token,
 		// Enable retrying on server errors
 		RetryServerErrors: true,

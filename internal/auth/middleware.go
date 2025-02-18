@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/c4po/tofu-state/internal/handlers/common"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/c4po/tofu-state/internal/constants"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	"go.uber.org/zap"
@@ -71,8 +71,8 @@ func JWTMiddleware(secret string, logger *zap.Logger) mux.MiddlewareFunc {
 			}
 
 			logger.Debug("Successfully authenticated user", zap.String("email", email))
-			ctx := context.WithValue(r.Context(), common.UserEmailKey, email)
-			ctx = context.WithValue(ctx, common.UserTokenKey, tokenString)
+			ctx := context.WithValue(r.Context(), constants.UserEmailKey, email)
+			ctx = context.WithValue(ctx, constants.UserTokenKey, tokenString)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

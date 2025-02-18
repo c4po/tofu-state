@@ -8,6 +8,7 @@ import (
 	"github.com/c4po/tofu-state/internal/config"
 	"github.com/c4po/tofu-state/internal/handlers"
 	"github.com/c4po/tofu-state/internal/storage"
+	"github.com/spf13/viper"
 
 	"github.com/gorilla/sessions"
 	"go.uber.org/zap"
@@ -18,13 +19,13 @@ func main() {
 	logger, _ := zap.NewDevelopment()
 	defer logger.Sync()
 
-	cfg := config.LoadConfig()
+	config.LoadConfig()
 
-	if len(cfg.SessionSecret) < 32 {
+	if len(viper.GetString("session_secret")) < 32 {
 		logger.Fatal("Session secret must be at least 32 characters long")
 	}
 
-	store := sessions.NewCookieStore([]byte(cfg.SessionSecret))
+	store := sessions.NewCookieStore([]byte(viper.GetString("session_secret")))
 	store.Options = &sessions.Options{
 		Path:     "/",
 		MaxAge:   86400 * 7,
@@ -34,13 +35,13 @@ func main() {
 	}
 
 	// Initialize OIDC
-	oidcClient := auth.NewOIDCClient(cfg.OIDCConfig, logger)
+	oidcClient := auth.NewOIDCClient(logger)
 
 	// Initialize storage
-	storageBackend := storage.NewStorageBackend(cfg.StorageConfig, logger)
+	storageBackend := storage.NewStorageBackend(logger)
 
 	// Setup router
-	router := handlers.SetupRouter(cfg, store, oidcClient, storageBackend, logger)
+	router := handlers.SetupRouter(store, oidcClient, storageBackend, logger)
 
 	// Add logging middleware
 	router.Use(func(next http.Handler) http.Handler {
@@ -50,19 +51,19 @@ func main() {
 		})
 	})
 
-	logger.Info("Server starting on", zap.String("address", cfg.ServerAddress))
+	logger.Info("Server starting on", zap.String("address", viper.GetString("server_address")))
 
 	server := &http.Server{
-		Addr:         cfg.ServerAddress,
+		Addr:         viper.GetString("server_address"),
 		Handler:      router,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
-	if cfg.CertFile != "" && cfg.KeyFile != "" {
-		logger.Info("Using HTTPS with cert", zap.String("cert", cfg.CertFile), zap.String("key", cfg.KeyFile))
-		err := server.ListenAndServeTLS(cfg.CertFile, cfg.KeyFile)
+	if viper.GetString("cert_file") != "" && viper.GetString("key_file") != "" {
+		logger.Info("Using HTTPS with cert", zap.String("cert", viper.GetString("cert_file")), zap.String("key", viper.GetString("key_file")))
+		err := server.ListenAndServeTLS(viper.GetString("cert_file"), viper.GetString("key_file"))
 		if err != nil {
 			logger.Fatal("Failed to start HTTPS server", zap.Error(err))
 		}

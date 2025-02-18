@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/c4po/tofu-state/internal/config"
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/sessions"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
@@ -163,8 +163,7 @@ func generateAPIToken(email string) (string, error) {
 
 	// Sign token with server secret
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	cfg := config.LoadConfig()
-	return t.SignedString([]byte(cfg.JWTSecret))
+	return t.SignedString([]byte(viper.GetString("jwt_secret")))
 }
 
 func getEmailFromToken(token *jwt.Token) (string, error) {

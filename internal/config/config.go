@@ -2,65 +2,49 @@ package config
 
 import (
 	"log"
-	"os"
 
-	"github.com/c4po/tofu-state/internal/storage"
-	"github.com/kelseyhightower/envconfig"
-	"gopkg.in/yaml.v3"
+	"github.com/spf13/viper"
 )
 
-type Config struct {
-	ServerAddress string                `yaml:"server_address,omitempty"`
-	SessionSecret string                `yaml:"session_secret,omitempty"`
-	JWTSecret     string                `yaml:"jwt_secret,omitempty"`
-	CertFile      string                `yaml:"cert_file,omitempty"`
-	KeyFile       string                `yaml:"key_file,omitempty"`
-	OIDCConfig    OIDCConfig            `yaml:"oidc"`
-	StorageConfig storage.StorageConfig `yaml:"storage"`
-	BackendURL    string                `yaml:"backend_url,omitempty"`
-}
+func LoadConfig() {
+	log.Println("Starting to load configuration...")
 
-type OIDCConfig struct {
-	IssuerURL    string `yaml:"issuer_url"`
-	ClientID     string `yaml:"client_id"`
-	ClientSecret string `yaml:"client_secret"`
-	RedirectURL  string `yaml:"redirect_url"`
-}
+	viper.SetConfigName("config") // name of config file (without extension)
+	viper.SetConfigType("yaml")   // REQUIRED if the config file does not have the extension in the name
+	viper.AddConfigPath(".")      // path to look for the config file in
+	// Set environment variable prefix
+	viper.SetEnvPrefix("TFS")
+	viper.AutomaticEnv() // read in environment variables that match
 
-func LoadConfig() *Config {
-	// Load base config from YAML
-	cfg := &Config{}
-	if data, err := os.ReadFile("config.yaml"); err == nil {
-		if err := yaml.Unmarshal(data, cfg); err != nil {
-			log.Fatal("Error parsing config.yaml: ", err)
+	// Read the config file
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			// Config file was found but another error was produced
+			log.Fatalf("Error reading config file: %s", err)
 		}
+		// Config file not found; ignore error if desired
+		log.Printf("No config file found. Using defaults and environment variables")
+	} else {
+		log.Printf("Using config file: %s", viper.ConfigFileUsed())
 	}
 
-	// Override with environment variables (TFS_ prefix)
-	err := envconfig.Process("TFS", cfg)
-	if err != nil {
-		log.Fatal("Error processing environment variables: ", err)
-	}
+	// Set default values
+	viper.SetDefault("jwt_secret", "default-insecure-secret-please-change-in-prod")
+	viper.SetDefault("session_secret", "default-insecure-secret-please-change-in-prod")
+	viper.SetDefault("tfe_backend_url", "http://localhost:8080")
 
-	if cfg.JWTSecret == "" {
-		cfg.JWTSecret = "default-insecure-secret-please-change-in-prod"
-	}
-
-	if cfg.SessionSecret == "" {
-		cfg.SessionSecret = "default-insecure-secret-please-change-in-prod"
-	}
-
-	if cfg.ServerAddress == "" {
-		if cfg.CertFile != "" && cfg.KeyFile != "" {
-			cfg.ServerAddress = "0.0.0.0:443"
+	// Set default server address based on SSL configuration
+	if viper.GetString("server_address") == "" {
+		if viper.GetString("cert_file") != "" && viper.GetString("key_file") != "" {
+			viper.Set("server_address", "0.0.0.0:443")
 		} else {
-			cfg.ServerAddress = "0.0.0.0:80"
+			viper.Set("server_address", "0.0.0.0:80")
 		}
 	}
 
-	if cfg.BackendURL == "" {
-		cfg.BackendURL = "http://localhost:8080"
-	}
-
-	return cfg
+	log.Printf("Configuration loaded successfully:")
+	log.Printf("- Server Address: %s", viper.GetString("server_address"))
+	log.Printf("- TFE Backend URL: %s", viper.GetString("tfe_backend_url"))
+	log.Printf("- SSL Enabled: %v", viper.GetString("cert_file") != "" && viper.GetString("key_file") != "")
+	log.Printf("- OIDC Issuer URL: %s", viper.GetString("oidc.issuer_url"))
 }
